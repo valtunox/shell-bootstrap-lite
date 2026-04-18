@@ -1,0 +1,61 @@
+# Docker Compose Configuration Template
+# This template provides a standardized approach for containerized service deployment:
+# - Uses dynamic variable substitution for flexible configuration
+# - Implements consistent networking and volume management
+# - Supports health checks and service discovery
+# - Follows security best practices for container configuration
+# - Enables easy port and resource customization
+# - Maintains compatibility with universal entrypoint scripts
+# - Provides clear documentation for each configuration section
+# - Supports both development and production environments
+# - Implements proper container lifecycle management
+# - Ensures consistent naming and resource organization
+services:
+  redis:
+    image: redis:$${REDIS_VERSION:-7.2-alpine}
+    container_name: redis-server
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "$${REDIS_PORT:-6379}:6379"
+    environment:
+      - REDIS_PASSWORD=$${ADMIN_PASSWORD}
+    command: >
+      sh -c '
+      if [ -n "$$REDIS_PASSWORD" ]; then
+        redis-server --appendonly yes --save 60 1 --loglevel warning --requirepass "$$REDIS_PASSWORD"
+      else
+        redis-server --appendonly yes --save 60 1 --loglevel warning
+      fi
+      '
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: $${REDIS_MEMORY_LIMIT:-1G}
+          cpus: '$${REDIS_CPU_LIMIT:-1.0}'
+        reservations:
+          memory: $${REDIS_MEMORY_RESERVATION:-512M}
+          cpus: '$${REDIS_CPU_RESERVATION:-0.5}'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - redis-network
+networks:
+  redis-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+    driver: local
